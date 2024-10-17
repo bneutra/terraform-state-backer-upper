@@ -5,7 +5,7 @@ provider "aws" {
     tags = local.common_tags
   }
 }
-locals{
+locals {
   lambda_name = "${var.prefix}-state-saver-webhook"
 }
 # create an s3 bucket for state storage
@@ -48,14 +48,14 @@ resource "aws_kms_key" "state-file-backups-key" {
 
 # create webhook
 module "webhook" {
-  source        = "terraform-aws-modules/lambda/aws"
-  version       = "7.4.0"
-  function_name           = local.lambda_name
-  description             = "Receives webhook notifications from TFC and saves state files to S3."
-  handler                 = "main.lambda_handler"
-  runtime                 = "python3.12"
+  source             = "terraform-aws-modules/lambda/aws"
+  version            = "7.4.0"
+  function_name      = local.lambda_name
+  description        = "Receives webhook notifications from TFC and saves state files to S3."
+  handler            = "main.lambda_handler"
+  runtime            = "python3.12"
   policies           = [aws_iam_policy.lambda_policy.arn]
-    number_of_policies = 1
+  number_of_policies = 1
   attach_policies    = true
   memory_size        = 1024
   create_role        = true
@@ -69,18 +69,17 @@ module "webhook" {
   ]
 
   environment_variables = {
-      REGION                     = var.region
-      S3_BUCKET                  = aws_s3_bucket.state-file-backups.id
-      SALT_PATH                  = aws_ssm_parameter.notification_token.name
-      TFC_TOKEN_PATH             = aws_ssm_parameter.tfc_token.name
+    REGION         = var.region
+    S3_BUCKET      = aws_s3_bucket.state-file-backups.id
+    SALT_PATH      = aws_ssm_parameter.notification_token.name
+    TFC_TOKEN_PATH = aws_ssm_parameter.tfc_token.name
   }
-    tags = {
+  tags = {
     datadog  = true
     service  = local.lambda_name
     CostType = "OpEx-RnD"
   }
 }
-
 
 resource "aws_ssm_parameter" "tfc_token" {
   name        = "${var.prefix}-tfc-token"
@@ -114,26 +113,6 @@ resource "aws_s3_bucket_public_access_block" "webhook" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
-
-# resource "aws_s3_object" "webhook" {
-#   bucket = aws_s3_bucket.webhook.id
-#   key    = "v1/webhook.zip"
-#   source = "${path.module}/files/webhook.zip"
-
-#   etag = filemd5("${path.module}/files/webhook.zip")
-# }
-
-
-# data "aws_iam_policy_document" "webhook_assume_role_policy_definition" {
-#   statement {
-#     effect  = "Allow"
-#     actions = ["sts:AssumeRole"]
-#     principals {
-#       identifiers = ["lambda.amazonaws.com"]
-#       type        = "Service"
-#     }
-#   }
-# }
 
 resource "aws_iam_policy" "lambda_policy" {
   name   = "${var.prefix}-state-saver-lambda-webhook-policy"
