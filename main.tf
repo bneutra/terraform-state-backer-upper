@@ -5,16 +5,14 @@ provider "aws" {
     tags = local.common_tags
   }
 }
-
+locals{
+  lambda_name = "${var.prefix}-state-saver-webhook"
+}
 # create an s3 bucket for state storage
 resource "aws_s3_bucket" "state-file-backups" {
   bucket = "${var.prefix}-state-files"
 }
 
-resource "aws_s3_bucket_acl" "state-file-backups" {
-  bucket = aws_s3_bucket.state-file-backups.id
-  acl    = "private"
-}
 
 resource "aws_s3_bucket_versioning" "state-file-backups" {
   bucket = aws_s3_bucket.state-file-backups.id
@@ -49,57 +47,63 @@ resource "aws_kms_key" "state-file-backups-key" {
 }
 
 # create webhook
-resource "aws_lambda_function" "webhook" {
-  function_name           = "${var.prefix}-state-saver-webhook"
+module "webhook" {
+  source        = "terraform-aws-modules/lambda/aws"
+  version       = "7.4.0"
+  function_name           = local.lambda_name
   description             = "Receives webhook notifications from TFC and saves state files to S3."
-  code_signing_config_arn = aws_lambda_code_signing_config.this.arn
-  role                    = aws_iam_role.lambda_exec.arn
   handler                 = "main.lambda_handler"
-  runtime                 = "python3.7"
-  layers                  = ["arn:aws:lambda:${var.region}:634166935893:layer:vault-lambda-extension:14"]
+  runtime                 = "python3.12"
+  policies           = [aws_iam_policy.lambda_policy.arn]
+    number_of_policies = 1
+  attach_policies    = true
+  memory_size        = 1024
+  create_role        = true
+  role_name          = local.lambda_name
+  timeout            = 30
+  source_path = [
+    {
+      path             = "${path.module}/files",
+      pip_requirements = "${path.module}/files/requirements.txt"
+    }
+  ]
 
-  s3_bucket = aws_s3_bucket.webhook.bucket
-  s3_key    = aws_s3_object.webhook.id
-
-  environment {
-    variables = {
+  environment_variables = {
       REGION                     = var.region
       S3_BUCKET                  = aws_s3_bucket.state-file-backups.id
       SALT_PATH                  = aws_ssm_parameter.notification_token.name
       TFC_TOKEN_PATH             = aws_ssm_parameter.tfc_token.name
-      VAULT_ADDR                 = var.vault_addr
-      VAULT_AUTH_ROLE            = "state-saver-lambda",
-      VAULT_AUTH_PROVIDER        = "aws",
-      VAULT_SECRET_PATH          = "terraform/creds/state-saver",
-      VAULT_SECRET_FILE          = "/tmp/vault_secret.json",
-      VAULT_DEFAULT_CACHE_ENABLE = true,
-      VAULT_DEFAULT_CACHE_TTL    = "5m",
-      VAULT_SKIP_VERIFY          = "true"
-    }
+  }
+    tags = {
+    datadog  = true
+    service  = local.lambda_name
+    CostType = "OpEx-RnD"
   }
 }
+
 
 resource "aws_ssm_parameter" "tfc_token" {
   name        = "${var.prefix}-tfc-token"
   description = "Terraform Cloud team token"
   type        = "SecureString"
-  value       = var.tfc_token
+  value       = "CHANGE_ME"
+  lifecycle {
+    ignore_changes = [value]
+  }
 }
 
 resource "aws_ssm_parameter" "notification_token" {
   name        = "${var.prefix}-tfc-notification-token"
   description = "Terraform Cloud webhook notification token"
   type        = "SecureString"
-  value       = var.notification_token
+  value       = "CHANGE_ME"
+  lifecycle {
+    ignore_changes = [value]
+  }
 }
 
 resource "aws_s3_bucket" "webhook" {
   bucket = "${var.prefix}-state-saver-webhook"
-}
-
-resource "aws_s3_bucket_acl" "webhook" {
-  bucket = aws_s3_bucket.webhook.id
-  acl    = "private"
 }
 
 resource "aws_s3_bucket_public_access_block" "webhook" {
@@ -119,25 +123,19 @@ resource "aws_s3_object" "webhook" {
   etag = filemd5("${path.module}/files/webhook.zip")
 }
 
-resource "aws_iam_role" "lambda_exec" {
-  name = "${var.prefix}-state-saver-webhook-lambda"
 
-  assume_role_policy = data.aws_iam_policy_document.webhook_assume_role_policy_definition.json
-}
+# data "aws_iam_policy_document" "webhook_assume_role_policy_definition" {
+#   statement {
+#     effect  = "Allow"
+#     actions = ["sts:AssumeRole"]
+#     principals {
+#       identifiers = ["lambda.amazonaws.com"]
+#       type        = "Service"
+#     }
+#   }
+# }
 
-data "aws_iam_policy_document" "webhook_assume_role_policy_definition" {
-  statement {
-    effect  = "Allow"
-    actions = ["sts:AssumeRole"]
-    principals {
-      identifiers = ["lambda.amazonaws.com"]
-      type        = "Service"
-    }
-  }
-}
-
-resource "aws_iam_role_policy" "lambda_policy" {
-  role   = aws_iam_role.lambda_exec.name
+resource "aws_iam_policy" "lambda_policy" {
   name   = "${var.prefix}-state-saver-lambda-webhook-policy"
   policy = data.aws_iam_policy_document.lambda_policy_definition.json
 }
@@ -160,15 +158,11 @@ data "aws_iam_policy_document" "lambda_policy_definition" {
   }
 }
 
-resource "aws_iam_role_policy_attachment" "cloudwatch_lambda_attachment" {
-  role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
-}
 
 resource "aws_lambda_permission" "apigw" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.webhook.function_name
+  function_name = module.webhook.lambda_function_name
   principal     = "apigateway.amazonaws.com"
 
   # The "/*/*" portion grants access from any method on any resource
@@ -202,7 +196,7 @@ resource "aws_api_gateway_integration" "lambda" {
 
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.webhook.invoke_arn
+  uri                     = module.webhook.lambda_function_invoke_arn
 }
 
 resource "aws_api_gateway_method" "proxy_root" {
@@ -219,7 +213,7 @@ resource "aws_api_gateway_integration" "lambda_root" {
 
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.webhook.invoke_arn
+  uri                     = module.webhook.lambda_function_invoke_arn
 }
 
 resource "aws_api_gateway_deployment" "webhook" {
@@ -232,18 +226,4 @@ resource "aws_api_gateway_deployment" "webhook" {
   stage_name  = "state-saver"
 }
 
-resource "aws_signer_signing_profile" "this" {
-  platform_id = "AWSLambda-SHA384-ECDSA"
-}
 
-resource "aws_lambda_code_signing_config" "this" {
-  allowed_publishers {
-    signing_profile_version_arns = [
-      aws_signer_signing_profile.this.arn,
-    ]
-  }
-
-  policies {
-    untrusted_artifact_on_deployment = "Warn"
-  }
-}

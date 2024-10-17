@@ -16,7 +16,6 @@ REGION = os.getenv("REGION", None)
 S3_BUCKET = os.getenv("S3_BUCKET", None)
 SALT_PATH = os.getenv("SALT_PATH", None)
 TFC_TOKEN_PATH = os.getenv("TFC_TOKEN_PATH", None)
-VAULT_SECRET_FILE = os.getenv("VAULT_SECRET_FILE", None)
 
 SAVE_STATES = {'applied'}
 
@@ -62,17 +61,15 @@ def post(event):
 
     if payload and 'run_status' in payload['notifications'][0]:
         body = payload['notifications'][0]
+        if not body['run_status']:
+            print("Run status set to null in payload.")
+
         if body['run_status'] in SAVE_STATES:
             print("Run status indicates save the state file.")
             if payload['workspace_name']:
-                if VAULT_SECRET_FILE:
-                    vault_secret_file = open(VAULT_SECRET_FILE)
-                    vault_secret = json.load(vault_secret_file)
-                    tfc_api_token = vault_secret['data']['token']
-                else:
-                    tfc_api_token = bytes(ssm.get_parameter(
-                        Name=TFC_TOKEN_PATH, WithDecryption=True)['Parameter']['Value'], 'utf-8')
-                    tfc_api_token = tfc_api_token.decode("utf-8")
+                tfc_api_token = bytes(ssm.get_parameter(
+                    Name=TFC_TOKEN_PATH, WithDecryption=True)['Parameter']['Value'], 'utf-8')
+                tfc_api_token = tfc_api_token.decode("utf-8")
 
                 state_api_url = 'https://app.terraform.io/api/v2/workspaces/' + \
                     payload['workspace_id'] + '/current-state-version'
