@@ -1,5 +1,13 @@
 # Terraform Cloud/Enterprise State Saver
 
+```
+This is a fork of https://github.com/bneutra/terraform-state-backer-upper:
+- fix bugs
+- support run tasks (which is a better solution at this point)
+- use the community lambda to streamline things a bit
+- TODO: the rest of this README is un-altered, so out of date re: using notifications
+```
+
 This is an AWS Lambda function that receives notifications from Terraform Cloud workspaces, and saves that workspace's latest state file into a corresponding S3 bucket.
 
 This workspace will require AWS access/credentials to provision.
@@ -45,7 +53,3 @@ Example usage:
 ```
 → ./files/add_notification_to_workspaces.sh hashidemos workspace-1 https://h8alki27g6.execute-api.us-west-2.amazonaws.com/state-saver
 ```
-
-### Removing Static Secret with Vault
-
-The webhook requires a Terraform Cloud API token to access and save state files. In the default case this token is provided as a terraform variable. However, if we'd like to eliminate the use of a static credential we can accomplish this with HashiCorp Vault and the [Terraform Cloud Secrets Engine](https://developer.hashicorp.com/vault/docs/secrets/terraform). First we'll configure the engine in Vault to be able to generate short lived API tokens. Then we'll use the [Vault AWS Lambda Extension](https://developer.hashicorp.com/vault/tutorials/app-integration/aws-lambda) to help retrieve the short lived token from Vault for use by the webhook. 
