@@ -204,5 +204,3 @@ resource "aws_api_gateway_deployment" "webhook" {
   rest_api_id = aws_api_gateway_rest_api.webhook.id
   stage_name  = "state-saver"
 }
-
-
