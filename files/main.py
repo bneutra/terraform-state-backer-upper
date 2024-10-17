@@ -67,18 +67,21 @@ def run_task_post(event: dict) -> dict:
     tfc_api_token = tfc_api_token.decode("utf-8")
     payload = json.loads(event["body"])
 
-    if payload and "workspace_id" in payload:
-        if payload["stage"] is None:
-            print("Run status set to null in payload.")
-        if payload["stage"] != RUN_TASK_APPLY_STATE:
-            print(f"Run status is {payload['stage']}. We expect post_apply.")
-        else:
-            workspace_id = payload["workspace_id"]
-            workspace_name = payload["workspace_name"]
+    if payload["stage"] is None:
+        ("Run stage set to null in payload. Test event?")
+    elif payload["stage"] == RUN_TASK_APPLY_STATE:
+        workspace_id = payload["workspace_id"]
+        workspace_name = payload["workspace_name"]
+        callback_url = payload["task_result_callback_url"]
+        access_token = payload["access_token"]
+        try:
             save_state(workspace_id, workspace_name, tfc_api_token)
-            callback_url = payload["task_result_callback_url"]
-            access_token = payload["access_token"]
             task_callback(callback_url, access_token, "State saved", "passed")
+        except Exception as e:
+            task_callback(callback_url, access_token, f"Exception saving state: {e}", "failed")
+            raise e
+    else:
+        raise Exception("Unsupported run stage: ", payload["stage"])
     return {"statusCode": 200, "body": OK_RESPONSE}
 
 
