@@ -115,13 +115,13 @@ resource "aws_s3_bucket_public_access_block" "webhook" {
   restrict_public_buckets = true
 }
 
-resource "aws_s3_object" "webhook" {
-  bucket = aws_s3_bucket.webhook.id
-  key    = "v1/webhook.zip"
-  source = "${path.module}/files/webhook.zip"
+# resource "aws_s3_object" "webhook" {
+#   bucket = aws_s3_bucket.webhook.id
+#   key    = "v1/webhook.zip"
+#   source = "${path.module}/files/webhook.zip"
 
-  etag = filemd5("${path.module}/files/webhook.zip")
-}
+#   etag = filemd5("${path.module}/files/webhook.zip")
+# }
 
 
 # data "aws_iam_policy_document" "webhook_assume_role_policy_definition" {
