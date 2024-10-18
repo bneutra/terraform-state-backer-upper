@@ -73,6 +73,10 @@ def run_task_post(event: dict) -> dict:
         workspace_name = payload["workspace_name"]
         callback_url = payload["task_result_callback_url"]
         access_token = payload["access_token"]
+        if any([not workspace_id, not workspace_name, not callback_url, not access_token]):
+            raise Exception(
+                "Missing workspace_id, workspace_name, callback_url, or access_token"
+            )
         try:
             task_callback(callback_url, access_token, "Saving tfstate", "running")
             save_state(workspace_id, workspace_name, tfc_api_token)
@@ -98,14 +102,17 @@ def notification_post(event: dict) -> dict:
 
     if payload and "run_status" in payload["notifications"][0]:
         body = payload["notifications"][0]
-        if not body["run_status"]:
-            print("Run status set to null in payload.")
-
-        if body["run_status"] != NOTIFICATION_APPLY_STATE:
-            print("Run status indicates save the state file.")
+        if body["run_status"] is None:
+            print("WARNING: run_status set to null in payload. Test event?")
+        elif body["run_status"] == NOTIFICATION_APPLY_STATE:
+            print("run_status indicates save the state file.")
             workspace_id = payload["workspace_id"]
             workspace_name = payload["workspace_name"]
+            if any([not workspace_id, not workspace_name]):
+                raise Exception("Missing workspace_id or workspace_name")
             save_state(workspace_id, workspace_name, tfc_api_token)
+        else:
+            print("WARNING: Unsupported run status: ", body["run_status"])
     return {"statusCode": 200, "body": OK_RESPONSE}
 
 
