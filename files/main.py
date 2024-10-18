@@ -74,6 +74,7 @@ def run_task_post(event: dict) -> dict:
         callback_url = payload["task_result_callback_url"]
         access_token = payload["access_token"]
         try:
+            task_callback(callback_url, access_token, "Saving tfstate", "running")
             save_state(workspace_id, workspace_name, tfc_api_token)
             task_callback(callback_url, access_token, "State saved", "passed")
         except Exception as e:
