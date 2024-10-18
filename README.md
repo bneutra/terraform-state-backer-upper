@@ -3,7 +3,7 @@
 ```
 This is a fork of https://github.com/bneutra/terraform-state-backer-upper:
 - fix bugs
-- support run tasks (which is a better solution at this point)
+- supports both TFC notification event and run task approach
 - use the community lambda to streamline things a bit
 ```
 
@@ -27,7 +27,13 @@ The Lambda acquires two secrets from SSM. After Terraform applying (creating the
 
 
 ### Enabling the Webhook on Workspaces
+You could use either notifications (notify after an apply is done)
+https://developer.hashicorp.com/terraform/cloud-docs/workspaces/settings/notifications
+
+Or run tasks (notify post-apply stage)
 https://developer.hashicorp.com/terraform/enterprise/api-docs/run-tasks/run-tasks
+
+The main difference is that run tasks are shown to the end user as part of the run (including whether it fails). Notifications might be better suited in this case but you should make sure that you monitor/alert if the process is failing.
 
 
 

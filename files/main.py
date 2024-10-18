@@ -37,9 +37,8 @@ def lambda_handler(event: dict, context) -> dict:
         "utf-8",
     )
     hash = hmac.new(salt, message, hashlib.sha512)
+    # support either notification or run task post-apply events: you choose
     if hash.hexdigest() == event["headers"].get("X-Tfe-Notification-Signature"):
-        # NOTE: I think run tasks are a better solution for this use case.
-        # but I'm leaving notification suppport for reference.
         if event["httpMethod"] == "POST":
             return notification_post(event)
         return get()
