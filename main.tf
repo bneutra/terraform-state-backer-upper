@@ -101,19 +101,6 @@ resource "aws_ssm_parameter" "notification_token" {
   }
 }
 
-resource "aws_s3_bucket" "webhook" {
-  bucket = "${var.prefix}-state-saver-webhook"
-}
-
-resource "aws_s3_bucket_public_access_block" "webhook" {
-  bucket = aws_s3_bucket.webhook.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
 resource "aws_iam_policy" "lambda_policy" {
   name   = "${var.prefix}-state-saver-lambda-webhook-policy"
   policy = data.aws_iam_policy_document.lambda_policy_definition.json

@@ -1,6 +1,8 @@
-""" This script receives notifications from Terraform Cloud workspaces
-    and automatically saves the latest state file from that workspace
-    to a corresponding S3 bucket. """
+""" main.py
+This script receives notifications from Terraform Cloud workspaces
+and automatically saves the latest state file from that workspace
+to a corresponding S3 bucket. 
+"""
 
 import base64
 import hashlib
