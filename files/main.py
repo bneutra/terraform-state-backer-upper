@@ -13,6 +13,7 @@ import boto3
 import requests
 
 
+DRY_RUN = os.getenv("DRY_RUN", False)
 REGION = os.getenv("REGION", None)
 S3_BUCKET = os.getenv("S3_BUCKET", None)
 SALT_PATH = os.getenv("SALT_PATH", None)
@@ -43,11 +44,13 @@ def lambda_handler(event: dict, context) -> dict:
     if hash.hexdigest() == event["headers"].get("X-Tfe-Notification-Signature"):
         if event["httpMethod"] == "POST":
             return notification_post(event)
-        return get()
+        if event["httpMethod"] == "GET":
+            return get()
     elif hash.hexdigest() == event["headers"].get("X-Tfc-Task-Signature"):
         if event["httpMethod"] == "POST":
             return run_task_post(event)
-        return get()
+        if event["httpMethod"] == "GET":
+            return get()
     print("Invalid HMAC signature")
     return {"statusCode": 400, "body": "Invalid HMAC signature"}
 
@@ -59,13 +62,7 @@ def get() -> dict:
 
 def run_task_post(event: dict) -> dict:
     """Handle a POST request for run tasks."""
-    tfc_api_token = bytes(
-        ssm.get_parameter(Name=TFC_TOKEN_PATH, WithDecryption=True)["Parameter"][
-            "Value"
-        ],
-        "utf-8",
-    )
-    tfc_api_token = tfc_api_token.decode("utf-8")
+
     payload = json.loads(event["body"])
 
     if payload["stage"] is None:
@@ -80,9 +77,12 @@ def run_task_post(event: dict) -> dict:
                 "Missing workspace_id, workspace_name, callback_url, or access_token"
             )
         try:
-            task_callback(callback_url, access_token, "Saving tfstate", "running")
-            save_state(workspace_id, workspace_name, tfc_api_token)
-            task_callback(callback_url, access_token, "State saved", "passed")
+            if DRY_RUN:
+                print("DRY RUN: Not saving state file.")
+            else:
+                task_callback(callback_url, access_token, "Saving tfstate", "running")
+                save_state(workspace_id, workspace_name, get_tfc_token())
+                task_callback(callback_url, access_token, "State saved", "passed")
         except Exception as e:
             task_callback(callback_url, access_token, f"Exception saving state: {e}", "failed")
             raise e
@@ -93,13 +93,6 @@ def run_task_post(event: dict) -> dict:
 
 def notification_post(event: dict) -> dict:
     """Handle a POST request for notifications."""
-    tfc_api_token = bytes(
-        ssm.get_parameter(Name=TFC_TOKEN_PATH, WithDecryption=True)["Parameter"][
-            "Value"
-        ],
-        "utf-8",
-    )
-    tfc_api_token = tfc_api_token.decode("utf-8")
     payload = json.loads(event["body"])
 
     if payload and "run_status" in payload["notifications"][0]:
@@ -112,10 +105,24 @@ def notification_post(event: dict) -> dict:
             workspace_name = payload["workspace_name"]
             if any([not workspace_id, not workspace_name]):
                 raise Exception("Missing workspace_id or workspace_name")
-            save_state(workspace_id, workspace_name, tfc_api_token)
+            if DRY_RUN:
+                print("DRY RUN: Not saving state file.")
+            else:
+                save_state(workspace_id, workspace_name, get_tfc_token())
         else:
             print("WARNING: Unsupported run status: ", body["run_status"])
     return {"statusCode": 200, "body": OK_RESPONSE}
+
+
+def get_tfc_token() -> str:
+    """Get the TFC token from the SSM parameter store."""
+    tfc_api_token = bytes(
+        ssm.get_parameter(Name=TFC_TOKEN_PATH, WithDecryption=True)["Parameter"][
+            "Value"
+        ],
+        "utf-8",
+    )
+    return tfc_api_token.decode("utf-8")
 
 
 def task_callback(callback_url: str, access_token: str, message: str, status: str) -> None:

@@ -12,15 +12,15 @@ Globals:
     MemorySize: 512
 
 Resources:
-  StateSaveFunction:
+  TFCWebhookFunction:
   # Note: the log group is created by the Lambda function, on demand
   # (weird, right?), IAM policy to write to logs as well.
   # you could explicitly create it as well but that's not typical
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub "${Environment}-StateSave"
-      CodeUri: statesave/
-      Handler: main.lambda_handler
+      FunctionName: !Sub "${Environment}-TFCWebhook"
+      CodeUri: webhook/
+      Handler: state_save.lambda_handler
       Runtime: python3.12
       Architectures:
         - x86_64
@@ -52,7 +52,7 @@ Resources:
           - ssm:GetParameters
           - ssm:GetParameter
           Resource: !Sub "arn:aws:ssm:*:*:parameter/${Environment}/HMACToken"
-  # here for reference if you want to explicitly manage the log group
+  # here for reference: if you want to explicitly manage the log group
   # CloudWatch Log Group for Lambda function logs
   # MyLambdaLogGroup:
   #   Type: AWS::Logs::LogGroup
@@ -60,6 +60,34 @@ Resources:
   #     LogGroupName: !Sub "/aws/lambda/${Environment}-StateSave"
   #     RetentionInDays: 14
 
+  TFCStateSaveFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${Environment}-TFCStateSave"
+      CodeUri: webhook/
+      Handler: main.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          TFC_TOKEN_PATH: !Sub "/${Environment}/TFC_TOKEN"
+          S3_BUCKET: !Sub "${Environment}-statebackup"
+          DRY_RUN: "True"
+      Events:
+      Policies:
+      - Statement:
+        - Sid: SSMDescribeParametersPolicy
+          Effect: Allow
+          Action:
+          - ssm:DescribeParameters
+          Resource: "*"
+        - Sid: SSMGetParameterPolicy
+          Effect: Allow
+          Action:
+          - ssm:GetParameters
+          - ssm:GetParameter
+          Resource: !Sub "arn:aws:ssm:*:*:parameter/${Environment}/TFC_TOKEN"
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
