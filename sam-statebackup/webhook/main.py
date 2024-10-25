@@ -75,10 +75,11 @@ def notification_post(event: dict) -> dict:
             workspace_name = payload["workspace_name"]
             if any([not workspace_id, not workspace_name]):
                 raise Exception("Missing workspace_id or workspace_name")
+            function_name = NOTIFICATIONS_MAP[body["run_status"]]
             if DRY_RUN:
-                print("DRY RUN: Not saving state file.")
+                print(f"DRY RUN: Not invoking {function_name}")
             else:
-                invoke(NOTIFICATIONS_MAP[body["run_status"]], payload)
+                invoke(function_name, payload)
         else:
             print("WARNING: Unsupported run status: ", body["run_status"])
     return {"statusCode": 200, "body": OK_RESPONSE}

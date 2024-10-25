@@ -20,14 +20,13 @@ Resources:
     Properties:
       FunctionName: !Sub "${Environment}-TFCWebhook"
       CodeUri: webhook/
-      Handler: state_save.lambda_handler
+      Handler: main.lambda_handler
       Runtime: python3.12
       Architectures:
         - x86_64
       Environment:
         Variables:
           SALT_PATH: !Sub "/${Environment}/HMACToken"
-          DRY_RUN: "True"
       Events:
         StateSaveApi:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
@@ -65,7 +64,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${Environment}-TFCStateSave"
       CodeUri: webhook/
-      Handler: main.lambda_handler
+      Handler: state_save.lambda_handler
       Runtime: python3.12
       Architectures:
         - x86_64

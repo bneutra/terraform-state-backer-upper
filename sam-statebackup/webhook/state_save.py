@@ -1,7 +1,7 @@
-""" main.py
-This script receives notifications from Terraform Cloud workspaces
-and automatically saves the latest state file from that workspace
-to a corresponding S3 bucket. 
+""" state_save.py
+This script receives notifications from our TFC webhook
+and automatically saves the latest state file from the workspace
+to an S3 bucket. 
 """
 
 import base64
@@ -82,26 +82,11 @@ def save_state(workspace_id: str, workspace_name: str) -> None:
 
     state_md5 = base64.b64encode(hashlib.md5(encoded_state).digest()).decode("utf-8")
 
+    if DRY_RUN:
+        print(f"DRY RUN: Not saving state file to {S3_BUCKET}/{workspace_name}")
+        return
     s3_response = s3.Bucket(S3_BUCKET).put_object(
         Key=workspace_name, Body=encoded_state, ContentMD5=state_md5
     )
     print("State file saved: ", s3_response)
 
-
-# for run task events
-# def task_callback(callback_url: str, access_token: str, message: str, status: str) -> None:
-#     """Send a PATCH request to the callback URL."""
-#     payload = {
-#         "data": {
-#             "type": "task-result",
-#             "attributes": {
-#                 "status": status,
-#                 "message": message,
-#             },
-#         }
-#     }
-#     tfc_headers = get_headers(access_token)
-#     response = requests.patch(callback_url, headers=tfc_headers, json=payload)
-#     if response.status_code > 399:
-#         raise Exception("Error sending task callback: ", response.text)
-#     print("Task callback sent successfully: ", response.status_code)
