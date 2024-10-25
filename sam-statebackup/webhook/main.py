@@ -1,7 +1,7 @@
 """ main.py
 This script receives notifications from Terraform Cloud workspaces
-and automatically saves the latest state file from that workspace
-to a corresponding S3 bucket. 
+and run tasks and invokes the appropriate handler function based on the
+notification type or run task stage.
 """
 
 import hashlib
