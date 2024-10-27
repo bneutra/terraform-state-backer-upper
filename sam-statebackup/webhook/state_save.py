@@ -57,6 +57,11 @@ def get_headers(token: str) -> dict:
 def save_state(workspace_id: str, workspace_name: str) -> None:
     """Save the state file to the S3 bucket."""
 
+    # TODO: in the event of an error, we could retry but I anticipiate
+    # throttling issues with the TFC API. One possible approach:
+    # record a marker object in S3 with the run ID and workspace name
+    # an hourly lambda could check for these markers and retry the save
+
     state_api_url = (
         "https://app.terraform.io/api/v2/workspaces/"
         + workspace_id
