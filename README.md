@@ -1,12 +1,10 @@
 # Terraform Cloud/Enterprise State Saver
 
-```
 This is a fork of https://github.com/bneutra/terraform-state-backer-upper:
 - fix bugs
 - supports both TFC notification event and run task approach
 - use the community lambda to streamline things a bit
 NOTE: I moved to using SAM instead of Terraform and improved the python code here: https://github.com/bneutra/tfc-state-backup
-```
 
 This is an AWS Lambda function that receives notifications from Terraform Cloud workspaces, and saves that workspace's latest state file into a corresponding S3 bucket.
 
